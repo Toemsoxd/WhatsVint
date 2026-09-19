@@ -1,13 +1,74 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WhatsVint</title>
+  <style>
+    body { font-family: sans-serif; margin: 12px; max-width: 520px; }
+    #qr { max-width: 320px; width: 100%; image-rendering: pixelated; }
+    .hidden { display: none; }
+    button, input { font-size: 16px; padding: 8px; }
+    li { margin: 8px 0; }
+  </style>
 </head>
 <body>
   <h1>WhatsVint</h1>
-  <p>WhatsApp Web interface for vintage phones.</p>
-  <p>QR login will appear here.</p>
+  <p id="status">Iniciando WhatsApp Web...</p>
+  <section id="login">
+    <p>Escanea este QR desde WhatsApp en tu teléfono principal:</p>
+    <img id="qr" alt="QR de WhatsApp Web">
+    <p id="qrText">Esperando QR...</p>
+  </section>
+  <section id="app" class="hidden">
+    <h2>Chats</h2>
+    <button id="refresh">Actualizar</button>
+    <ul id="chats"></ul>
+  </section>
+  <script>
+    const statusEl = document.getElementById('status');
+    const qrEl = document.getElementById('qr');
+    const qrText = document.getElementById('qrText');
+    const loginEl = document.getElementById('login');
+    const appEl = document.getElementById('app');
+    const chatsEl = document.getElementById('chats');
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        statusEl.textContent = 'Estado: ' + data.state;
+        if (data.qr) {
+          qrEl.src = data.qr;
+          qrText.textContent = 'Escanea el código.';
+        } else {
+          qrEl.removeAttribute('src');
+          qrText.textContent = data.error || '';
+        }
+        const ready = data.state === 'ready';
+        loginEl.classList.toggle('hidden', ready);
+        appEl.classList.toggle('hidden', !ready);
+        if (ready) await loadChats();
+      } catch (error) {
+        statusEl.textContent = 'Error: ' + error.message;
+      }
+    }
+
+    async function loadChats() {
+      const res = await fetch('/api/chats');
+      if (!res.ok) return;
+      const chats = await res.json();
+      chatsEl.innerHTML = '';
+      chats.forEach(chat => {
+        const li = document.createElement('li');
+        li.textContent = chat.name + (chat.unreadCount ? ' (' + chat.unreadCount + ')' : '');
+        chatsEl.appendChild(li);
+      });
+    }
+
+    document.getElementById('refresh').addEventListener('click', loadChats);
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
+  </script>
 </body>
 </html>
